@@ -2,6 +2,8 @@
 
 set -eo pipefail
 
+export MYSQL_VERSION=8.0.21
+
 # $1=OPENSHIFT_CI=true means running in CI
 if [[ "$1" == "true" ]]; then
 
@@ -16,6 +18,7 @@ if [[ "$1" == "true" ]]; then
 	export PATH=${PATH}:${M2_HOME}/bin
 	popd
 
+	mvn dependency:get -Dartifact=mysql:mysql-connector-java:${MYSQL_VERSION} -Ddest=/build/mysql-connector-java.jar
   	mvn -B -e -T 1C -DskipTests=true -DfailIfNoTests=false -Dtest=false clean package -Pdist
 else
     # Otherwise this is a production brew build by ART
@@ -33,4 +36,13 @@ else
 	  tar -xvf /tmp/hive-bin.tar.gz -C /tmp \
 	  && mv /tmp/apache-hive-${HIVE_VERSION}.redhat-${RH_HIVE_PATCH_VERSION}-bin/ \
 	  $HIVE_OUT
+
+	# Note(tflannag): In previous metering releases, we got the mysql-connector-java jar
+	# for free. Now, images use RHEL8 as the base image and in order to maintain upgrades
+	# to 4.6+ releases, curl that build from PNC (.tar.gz is also available) and move to
+	# the correct path in the destination container in the Dockerfile workflow.
+	export RH_MYSQL_CONNECTOR_PATCH_VERSION=00001
+	curl -fSLs \
+		http://download.eng.bos.redhat.com/brewroot/packages/mysql-mysql-connector-java/${MYSQL_VERSION}.redhat_${RH_MYSQL_CONNECTOR_PATCH_VERSION}/1/maven/mysql/mysql-connector-java/${MYSQL_VERSION}.redhat-${RH_MYSQL_CONNECTOR_PATCH_VERSION}/mysql-connector-java-${MYSQL_VERSION}.redhat-${RH_MYSQL_CONNECTOR_PATCH_VERSION}.jar \
+		-o /build/mysql-connector-java.jar
 fi
